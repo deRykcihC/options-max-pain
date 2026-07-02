@@ -7,7 +7,7 @@ Small local web app that fetches delayed options data from Cboe, computes max pa
 Use the bundled Codex Python on this machine:
 
 ```powershell
-& 'C:\Users\wjiho\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' server.py
+& 'C:\Users\wjiho\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' server.py 8000
 ```
 
 Then open:

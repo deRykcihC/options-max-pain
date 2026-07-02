@@ -17,9 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / "public"
-DEFAULT_HOST = "127.0.0.1"
-DEPLOY_HOST = "0.0.0.0"
-DEFAULT_PORT = 8000
+DEFAULT_HOST = "0.0.0.0"
+DEFAULT_PORT = 10000
+LOCAL_DISPLAY_HOST = "127.0.0.1"
 CONTRACT_SIZE = 100
 CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{symbol}.json"
 OPTION_RE = re.compile(r"^(?P<root>.+?)(?P<yy>\d{2})(?P<mm>\d{2})(?P<dd>\d{2})(?P<type>[CP])(?P<strike>\d{8})$")
@@ -246,13 +246,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    host = os.environ.get("HOST") or (DEPLOY_HOST if os.environ.get("PORT") else DEFAULT_HOST)
+    host = os.environ.get("HOST", DEFAULT_HOST)
     port = int(os.environ.get("PORT", DEFAULT_PORT))
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
 
     server = ThreadingHTTPServer((host, port), Handler)
-    display_host = "127.0.0.1" if host == DEPLOY_HOST else host
+    display_host = LOCAL_DISPLAY_HOST if host == DEFAULT_HOST else host
     print(f"Max Pain app running at http://{display_host}:{port}")
     print("Press Ctrl+C to stop.")
     server.serve_forever()
