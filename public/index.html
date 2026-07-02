@@ -82,6 +82,31 @@
         </table>
       </section>
     </main>
-    <script src="/app.js"></script>
+    <script>
+      (function loadApp(attempt) {
+        var script = document.createElement("script");
+        script.src = "/app.js?v=" + Date.now() + "&attempt=" + attempt;
+        script.onload = function () {
+          var status = document.querySelector("#status");
+          if (status && status.textContent === "Loading...") {
+            status.textContent = "Loading delayed options chain...";
+          }
+        };
+        script.onerror = function () {
+          if (attempt < 10) {
+            setTimeout(function () {
+              loadApp(attempt + 1);
+            }, Math.min(1000 * attempt, 5000));
+            return;
+          }
+          var status = document.querySelector("#status");
+          if (status) {
+            status.textContent = "Could not load the app script. Refresh the page in a minute.";
+            status.dataset.kind = "error";
+          }
+        };
+        document.body.appendChild(script);
+      })(1);
+    </script>
   </body>
 </html>

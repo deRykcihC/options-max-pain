@@ -73,6 +73,30 @@ function renderTable(rows) {
   }
 }
 
+async function fetchJsonWithRetry(url, retries = 5) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload.error || `Request failed with ${response.status}`);
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt === retries) break;
+      setStatus(`Waiting for data source... retry ${attempt}/${retries - 1}`, "muted");
+      await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * attempt, 5000)));
+    }
+  }
+
+  throw lastError;
+}
+
 async function loadMaxPain() {
   const symbol = elements.symbol.value.trim().toUpperCase() || "SNDK";
   const symbolChanged = symbol !== state.symbol;
@@ -84,12 +108,7 @@ async function loadMaxPain() {
   elements.expiration.disabled = true;
 
   try {
-    const response = await fetch(`/api/max-pain?${params.toString()}`);
-    const payload = await response.json();
-
-    if (!response.ok) {
-      throw new Error(payload.error || `Request failed with ${response.status}`);
-    }
+    const payload = await fetchJsonWithRetry(`/api/max-pain?${params.toString()}`);
 
     state.symbol = payload.symbol;
     state.expiration = payload.expiration;
