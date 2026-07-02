@@ -6,6 +6,7 @@ import mimetypes
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -23,6 +24,11 @@ LOCAL_DISPLAY_HOST = "127.0.0.1"
 CONTRACT_SIZE = 100
 CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{symbol}.json"
 OPTION_RE = re.compile(r"^(?P<root>.+?)(?P<yy>\d{2})(?P<mm>\d{2})(?P<dd>\d{2})(?P<type>[CP])(?P<strike>\d{8})$")
+CBOE_CACHE_TTL_SECONDS = 15 * 60
+CBOE_STALE_TTL_SECONDS = 6 * 60 * 60
+CBOE_RATE_LIMIT_BACKOFF_SECONDS = 2 * 60
+CBOE_CACHE: dict[str, dict] = {}
+CBOE_CACHE_LOCK = threading.RLock()
 
 
 class MaxPainError(Exception):
@@ -62,6 +68,43 @@ def fetch_json(url: str) -> dict:
         raise MaxPainError("Data source returned invalid JSON.") from exc
 
 
+def fetch_cboe_payload(symbol: str) -> tuple[dict, str, str | None, int | None]:
+    now = time.time()
+    url = CBOE_URL.format(symbol=urllib.parse.quote(symbol))
+
+    with CBOE_CACHE_LOCK:
+        entry = CBOE_CACHE.get(symbol)
+        if entry and now < entry["expires_at"]:
+            age = int(now - entry["fetched_at"])
+            return entry["payload"], "cached", None, age
+        if entry and now < entry.get("blocked_until", 0):
+            age = int(now - entry["fetched_at"])
+            warning = "Using cached data while Cboe rate limiting cools down."
+            return entry["payload"], "stale-cache", warning, age
+
+    try:
+        payload = fetch_json(url)
+    except MaxPainError as exc:
+        with CBOE_CACHE_LOCK:
+            entry = CBOE_CACHE.get(symbol)
+            if entry and now - entry["fetched_at"] <= CBOE_STALE_TTL_SECONDS:
+                entry["blocked_until"] = now + CBOE_RATE_LIMIT_BACKOFF_SECONDS
+                age = int(now - entry["fetched_at"])
+                warning = f"Using cached data because Cboe is unavailable: {exc}"
+                return entry["payload"], "stale-cache", warning, age
+        raise
+
+    with CBOE_CACHE_LOCK:
+        CBOE_CACHE[symbol] = {
+            "payload": payload,
+            "fetched_at": now,
+            "expires_at": now + CBOE_CACHE_TTL_SECONDS,
+            "blocked_until": 0,
+        }
+
+    return payload, "live", None, 0
+
+
 def parse_cboe_option(option_symbol: str) -> dict:
     match = OPTION_RE.match(option_symbol)
     if not match:
@@ -96,7 +139,7 @@ def numeric_price(value: object) -> float | None:
 def calculate_max_pain(symbol: str, requested_expiration: str = "") -> dict:
     symbol = re.sub(r"[^A-Za-z0-9._-]", "", symbol).upper() or "SNDK"
     url = CBOE_URL.format(symbol=urllib.parse.quote(symbol))
-    payload = fetch_json(url)
+    payload, cache_status, warning, cache_age_seconds = fetch_cboe_payload(symbol)
     data = payload.get("data") or {}
     options = data.get("options") or []
 
@@ -175,6 +218,9 @@ def calculate_max_pain(symbol: str, requested_expiration: str = "") -> dict:
         "expirations": sorted_expirations,
         "source": "Cboe delayed quotes",
         "source_url": url,
+        "cache_status": cache_status,
+        "cache_age_seconds": cache_age_seconds,
+        "warning": warning,
         "timestamp": payload.get("timestamp"),
         "fetched_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "underlying_price": numeric_price(data.get("current_price")),

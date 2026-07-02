@@ -82,13 +82,16 @@ async function fetchJsonWithRetry(url, retries = 5) {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || `Request failed with ${response.status}`);
+        const message = payload.error || `Request failed with ${response.status}`;
+        const error = new Error(message);
+        error.rateLimited = message.includes("HTTP 429") || message.toLowerCase().includes("rate limit");
+        throw error;
       }
 
       return payload;
     } catch (error) {
       lastError = error;
-      if (attempt === retries) break;
+      if (attempt === retries || error.rateLimited) break;
       setStatus(`Waiting for data source... retry ${attempt}/${retries - 1}`, "muted");
       await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * attempt, 5000)));
     }
@@ -127,7 +130,12 @@ async function loadMaxPain() {
     elements.payout.textContent = money(payload.max_pain.total_payout, 0);
 
     renderTable(payload.rows);
-    setStatus(`Loaded ${payload.contract_count.toLocaleString()} contracts.`, "ok");
+    if (payload.warning) {
+      setStatus(payload.warning, "muted");
+    } else {
+      const cacheNote = payload.cache_status === "cached" ? " from cache" : "";
+      setStatus(`Loaded ${payload.contract_count.toLocaleString()} contracts${cacheNote}.`, "ok");
+    }
   } catch (error) {
     setStatus(error.message, "error");
   } finally {
