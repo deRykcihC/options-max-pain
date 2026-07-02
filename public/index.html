@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Options Max Pain</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Delayed options open interest</p>
+          <h1><span id="heading-symbol">SNDK</span> Max Pain</h1>
+        </div>
+        <div class="controls">
+          <label>
+            Symbol
+            <input id="symbol" value="SNDK" autocomplete="off" list="symbol-presets">
+            <datalist id="symbol-presets">
+              <option value="SNDK"></option>
+              <option value="AAPL"></option>
+              <option value="TSLA"></option>
+              <option value="SPY"></option>
+              <option value="NVDA"></option>
+              <option value="MSFT"></option>
+              <option value="AMZN"></option>
+              <option value="META"></option>
+            </datalist>
+          </label>
+          <label>
+            Expiration
+            <select id="expiration"></select>
+          </label>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
+      </section>
+
+      <section class="quick-picks" aria-label="Quick symbol picks">
+        <button type="button" data-symbol="SNDK">SNDK</button>
+        <button type="button" data-symbol="AAPL">AAPL</button>
+        <button type="button" data-symbol="TSLA">TSLA</button>
+        <button type="button" data-symbol="SPY">SPY</button>
+        <button type="button" data-symbol="NVDA">NVDA</button>
+        <button type="button" data-symbol="MSFT">MSFT</button>
+      </section>
+
+      <section class="metrics" aria-label="Current max pain summary">
+        <div>
+          <span>Underlying</span>
+          <strong id="underlying">n/a</strong>
+        </div>
+        <div>
+          <span>Max Pain</span>
+          <strong id="max-pain">n/a</strong>
+        </div>
+        <div>
+          <span>Min Payout</span>
+          <strong id="payout">n/a</strong>
+        </div>
+      </section>
+
+      <section class="meta">
+        <span id="status">Loading...</span>
+        <span>Source: <strong id="source">n/a</strong></span>
+        <span>As of: <strong id="timestamp">n/a</strong></span>
+      </section>
+
+      <section class="table-wrap" aria-label="Max pain payout table">
+        <table>
+          <thead>
+            <tr>
+              <th>Expiry Price</th>
+              <th>Call OI</th>
+              <th>Put OI</th>
+              <th>Call Payout</th>
+              <th>Put Payout</th>
+              <th>Total Payout</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
