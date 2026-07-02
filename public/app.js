@@ -10,6 +10,7 @@ const elements = {
   expiration: document.querySelector("#expiration"),
   refresh: document.querySelector("#refresh"),
   status: document.querySelector("#status"),
+  cooldown: document.querySelector("#cooldown"),
   source: document.querySelector("#source"),
   timestamp: document.querySelector("#timestamp"),
   underlying: document.querySelector("#underlying"),
@@ -17,6 +18,13 @@ const elements = {
   payout: document.querySelector("#payout"),
   rows: document.querySelector("#rows"),
   quickPicks: document.querySelector(".quick-picks"),
+};
+
+const cooldown = {
+  symbol: "",
+  untilMs: 0,
+  scope: "",
+  timer: null,
 };
 
 function money(value, digits = 2) {
@@ -40,6 +48,47 @@ function compactNumber(value) {
 function setStatus(message, kind = "muted") {
   elements.status.textContent = message;
   elements.status.dataset.kind = kind;
+}
+
+function formatDuration(seconds) {
+  const safeSeconds = Math.max(0, Math.ceil(seconds || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function renderCooldown() {
+  if (!cooldown.untilMs) {
+    elements.cooldown.textContent = "n/a";
+    elements.refresh.textContent = "Refresh";
+    return;
+  }
+
+  const remainingSeconds = Math.max(0, Math.ceil((cooldown.untilMs - Date.now()) / 1000));
+  if (remainingSeconds <= 0) {
+    elements.cooldown.textContent = `Live fetch available for ${cooldown.symbol}`;
+    elements.refresh.textContent = "Refresh";
+    return;
+  }
+
+  elements.cooldown.textContent = `${formatDuration(remainingSeconds)} for ${cooldown.symbol} (${cooldown.scope})`;
+  elements.refresh.textContent = `Refresh (${formatDuration(remainingSeconds)})`;
+}
+
+function setCooldown(payload) {
+  const seconds = Number(payload.live_refresh_cooldown_seconds || 0);
+  cooldown.symbol = payload.symbol || "";
+  cooldown.scope = payload.cooldown_scope || "shared";
+  cooldown.untilMs = seconds > 0 ? Date.now() + seconds * 1000 : 0;
+
+  if (cooldown.timer) {
+    clearInterval(cooldown.timer);
+  }
+
+  renderCooldown();
+  if (cooldown.untilMs) {
+    cooldown.timer = setInterval(renderCooldown, 1000);
+  }
 }
 
 function renderExpirationOptions(expirations, selected) {
@@ -124,6 +173,7 @@ async function loadMaxPain() {
 
     elements.source.textContent = payload.source;
     elements.timestamp.textContent = payload.timestamp || "n/a";
+    setCooldown(payload);
     elements.underlying.textContent = money(payload.underlying_price);
     elements.maxPain.textContent = money(payload.max_pain.price);
     elements.maxPain.dataset.price = String(payload.max_pain.price);
@@ -134,7 +184,8 @@ async function loadMaxPain() {
       setStatus(payload.warning, "muted");
     } else {
       const cacheNote = payload.cache_status === "cached" ? " from cache" : "";
-      setStatus(`Loaded ${payload.contract_count.toLocaleString()} contracts${cacheNote}.`, "ok");
+      const liveNote = payload.cache_status === "live" ? " Live Cboe fetch succeeded." : "";
+      setStatus(`Loaded ${payload.contract_count.toLocaleString()} contracts${cacheNote}.${liveNote}`, "ok");
     }
   } catch (error) {
     setStatus(error.message, "error");

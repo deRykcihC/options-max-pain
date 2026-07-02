@@ -22,6 +22,8 @@ No Python packages are required.
 
 - Data source: Cboe delayed quote endpoint.
 - Default symbol: `SNDK`, with support for other optionable Cboe symbols.
+- Cboe responses are cached for 5 minutes per symbol to avoid rate limits.
+- The refresh cooldown is shared by all users on the same running server instance.
 - Max pain is based on open interest, not live intraday positioning.
 - This is a market-structure indicator, not a standalone closing-price predictor.
 
